@@ -1,0 +1,24 @@
+# Netlify settings for the Hurricane Landfall Tracker.
+# Netlify publishes the "public" folder and runs the small helpers in
+# netlify/functions whenever the page asks for storm data or an address lookup.
+
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+  command = ""
+
+[functions]
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), camera=(), microphone=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://basemap.nationalmap.gov https://mapservices.weather.noaa.gov; connect-src 'self' https://api.weather.gov; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+[[headers]]
+  for = "/data/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"

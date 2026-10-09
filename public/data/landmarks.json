@@ -1,0 +1,10 @@
+{
+  "about": "Hand-added beach landmarks that the town list misses (beaches, parks, well-known spots). Anyone can add one: name, region, lat, lon, and where the coordinate came from.",
+  "landmarks": [
+    { "name": "Pensacola Beach", "region": "FL", "lat": 30.3342, "lon": -87.1351, "source": "OpenStreetMap Nominatim" },
+    { "name": "Perdido Key", "region": "FL", "lat": 30.2995, "lon": -87.4293, "source": "OpenStreetMap Nominatim" },
+    { "name": "Fort Pickens", "region": "FL", "lat": 30.3240, "lon": -87.2798, "source": "OpenStreetMap Nominatim" },
+    { "name": "Johnson Beach", "region": "FL", "lat": 30.3000, "lon": -87.4140, "source": "OpenStreetMap" },
+    { "name": "Flora-Bama", "region": "AL/FL line", "lat": 30.2810, "lon": -87.5180, "source": "OpenStreetMap" }
+  ]
+}

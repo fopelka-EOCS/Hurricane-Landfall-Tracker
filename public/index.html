@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hurricane Landfall Tracker</title>
+<meta name="description" content="Pick an active storm, enter your address, and see where the National Hurricane Center forecast meets the coast and what reaches your address.">
+<meta name="theme-color" content="#0b2340">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#swirl"/></svg>
+      <div>
+        <h1>Hurricane Landfall Tracker</h1>
+        <p class="tagline">Where the forecast meets the coast, and what reaches your address. Straight from the National Hurricane Center.</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="standing" role="note">
+  <div class="wrap">
+    <strong>Evacuation orders come from your local emergency management office.</strong>
+    Follow them, whatever this map shows. This site is an aid to understanding, not an official forecast.
+  </div>
+</div>
+
+<main class="wrap">
+
+  <section class="controls" aria-label="Choose a storm and an address">
+    <div class="field">
+      <label for="storm">Active storm</label>
+      <div class="row">
+        <select id="storm" disabled><option>Loading storms from NHC…</option></select>
+        <button id="update" class="btn" type="button" title="Fetch the latest NHC advisory">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Update
+        </button>
+      </div>
+    </div>
+    <form id="addr-form" class="field grow" autocomplete="street-address">
+      <label for="address">Your address <span class="hint">(U.S. street address, city, state)</span></label>
+      <div class="row">
+        <input id="address" name="address" type="text" inputmode="text" placeholder="e.g., 100 Main Street, Gulf Shores, AL" required>
+        <button type="submit" class="btn primary">Check my address</button>
+      </div>
+      <label class="check"><input type="checkbox" id="remember"> Remember this address on this device</label>
+    </form>
+  </section>
+
+  <p id="status" class="status" aria-live="polite"></p>
+
+  <section class="layout">
+    <div class="map-col">
+      <div id="map" aria-label="Map of the forecast track, cone, warnings, and your address"></div>
+      <div class="map-tools">
+        <label class="check"><input type="checkbox" id="surge-toggle"> Show NHC potential storm surge flooding</label>
+        <label class="check"><input type="checkbox" id="grid-toggle" checked> Latitude/longitude grid</label>
+      </div>
+      <div id="surge-legend" class="legend" hidden>
+        <span><i style="background:#3b7fd9"></i>&gt; 1 ft above ground</span>
+        <span><i style="background:#f2d43b"></i>&gt; 3 ft</span>
+        <span><i style="background:#f08c2c"></i>&gt; 6 ft</span>
+        <span><i style="background:#d6372b"></i>&gt; 9 ft</span>
+        <span class="muted">Zoom in for detail. NHC's reasonable worst case, not a prediction for every street.</span>
+      </div>
+      <div class="legend key">
+        <span><i class="ln" style="background:#d6372b"></i>Hurricane Warning</span>
+        <span><i class="ln" style="background:#f39ac0"></i>Hurricane Watch</span>
+        <span><i class="ln" style="background:#2f6fd6"></i>Tropical Storm Warning</span>
+        <span><i class="ln" style="background:#f2d43b"></i>Tropical Storm Watch</span>
+        <span><i class="cone"></i>Forecast cone</span>
+        <span><i class="ring"></i>Estimated coast crossing</span>
+      </div>
+    </div>
+
+    <div class="panel-col">
+      <article id="reach-card" class="card emphasis" hidden></article>
+      <article id="storm-card" class="card" hidden></article>
+      <article id="crossing-card" class="card" hidden></article>
+    </div>
+  </section>
+
+  <section id="points-section" class="card wide" hidden>
+    <h2>Points along the coast</h2>
+    <p class="muted" id="points-note"></p>
+    <div class="table-scroll"><table id="points-table"></table></div>
+  </section>
+
+  <section id="advisory-section" class="card wide" hidden></section>
+
+  <section class="card wide" id="how">
+    <h2>How we know this</h2>
+    <p>Every number on this page comes from a public government source, except the coast crossing, which we estimate and label as an estimate.</p>
+    <div class="table-scroll">
+    <table class="provenance">
+      <thead><tr><th>What you see</th><th>Where it comes from</th><th>How much to trust it</th></tr></thead>
+      <tbody>
+        <tr><td>Storm position, winds, pressure, warnings, surge heights, forecast points, cone</td><td>National Hurricane Center (NOAA) advisories and forecast maps</td><td>Official. Full advisories every 6 hours, updates every 3 hours or sooner.</td></tr>
+        <tr><td>Alerts for your address (warnings, local statements, flood watches)</td><td>National Weather Service alerts for your exact point</td><td>Official, issued by your local NWS office.</td></tr>
+        <tr><td>When tropical-storm winds may arrive</td><td>NHC arrival-time maps and forecast wind field</td><td>Official inputs. The wind field marks the farthest reach in each direction, so it leans cautious.</td></tr>
+        <tr><td>Storm surge flooding layer</td><td>NHC Potential Storm Surge Flooding map</td><td>Official reasonable worst case. Issued when surge watches or warnings are in effect.</td></tr>
+        <tr><td>Your address's location</td><td>U.S. Census Bureau geocoder</td><td>Good to the block. Not a rooftop survey.</td></tr>
+        <tr><td>Estimated coast crossing</td><td>Our calculation: where NHC's straight-line track between forecast points first meets the shoreline (Census coastline)</td><td>An estimate, not an NHC product. The real crossing can land anywhere in the cone; the cone is NHC's measure of that uncertainty.</td></tr>
+        <tr><td>Towns and landmarks in the table</td><td>U.S. Census Gazetteer; a short hand-checked list of beach landmarks</td><td>For orientation only.</td></tr>
+        <tr><td>Base map</td><td>U.S. Geological Survey, The National Map</td><td>For orientation only.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="muted">Not used: news write-ups, social media, and individual computer-model runs ("spaghetti plots"). Your address is sent only to the Census Bureau to find its coordinates, and those coordinates only to the National Weather Service for alerts. We store nothing.</p>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-inner">
+    <div>
+      <p><strong>Not an official forecast.</strong> Always follow the National Hurricane Center (<a href="https://www.nhc.noaa.gov" rel="noopener">nhc.noaa.gov</a>), your local National Weather Service office, and your local emergency managers. Hurricane preparation: <a href="https://www.ready.gov/hurricanes" rel="noopener">ready.gov/hurricanes</a>.</p>
+      <p id="donate-line" hidden>This site is free and has no ads. If it helped, you can <a id="donate-link" href="#" rel="noopener">buy us a coffee</a>.</p>
+    </div>
+    <div class="eocs">
+      <p class="eyebrow">A public service of</p>
+      <p><a href="https://www.eocs.ltd" rel="noopener"><strong>Episodes of Care Solutions</strong></a></p>
+      <p class="muted">We build tools that follow care as a whole journey, an episode, rather than a single visit. A storm is an episode too: before, during, and after.</p>
+      <p class="muted">Open source on <a href="https://github.com/fopelka-EOCS/hurricane-landfall-tracker" rel="noopener">GitHub</a>.</p>
+    </div>
+  </div>
+</footer>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="swirl" viewBox="0 0 32 32">
+    <circle cx="16" cy="16" r="3.2" fill="currentColor"/>
+    <path d="M16 4c-5 0-9 3-10 8 3-3 7-3.5 10-2.5M28 16c0-5-3-9-8-10 3 3 3.5 7 2.5 10M16 28c5 0 9-3 10-8-3 3-7 3.5-10 2.5M4 16c0 5 3 9 8 10-3-3-3.5-7-2.5-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/geo.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
