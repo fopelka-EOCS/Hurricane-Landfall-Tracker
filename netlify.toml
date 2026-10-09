@@ -10,6 +10,20 @@
 [functions]
   node_bundler = "esbuild"
 
+# landfalltracker.com (and its www) forward permanently to the .org,
+# keeping the rest of the address so shared links still land in the right place.
+[[redirects]]
+  from = "https://landfalltracker.com/*"
+  to = "https://landfalltracker.org/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.landfalltracker.com/*"
+  to = "https://landfalltracker.org/:splat"
+  status = 301
+  force = true
+
 [[headers]]
   for = "/*"
   [headers.values]
