@@ -1,13 +1,13 @@
 # Checks that every outside source and the live site still work.
 #   Daily, May through November (hurricane season plus its early weeks).
-#   Weekly on Mondays, all year. The weekly run also refreshes HEALTH.md,
+#   Weekly on Mondays, all year. The weekly run also refreshes SOURCE_CHECK.md,
 #   which keeps GitHub from switching this schedule off during a quiet winter.
 # Any failure: the run is marked failed (GitHub emails the owner) and a
-# "Health check failing" issue is opened with the report. It closes itself
+# "Source check failing" issue is opened with the report. It closes itself
 # when a later check passes.
-# Run it by hand any time: Actions tab -> Health check -> Run workflow.
+# Run it by hand any time: Actions tab -> Source check -> Run workflow.
 
-name: Health check
+name: Source check
 
 on:
   schedule:
@@ -20,7 +20,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: health-check
+  group: source-check
   cancel-in-progress: false
 
 jobs:
@@ -39,34 +39,34 @@ jobs:
       - name: Run the checks
         id: check
         continue-on-error: true
-        run: node tools/healthcheck.mjs --out report.md
+        run: node tools/source-check.mjs --out report.md
 
-      - name: Open or update the "Health check failing" issue
+      - name: Open or update the "Source check failing" issue
         if: steps.check.outcome == 'failure'
         run: |
-          gh label create health-check --color D93F0B --description "Automated health check" --force >/dev/null
-          num=$(gh issue list --label health-check --state open --json number --jq '.[0].number')
+          gh label create source-check --color D93F0B --description "Automated source check" --force >/dev/null
+          num=$(gh issue list --label source-check --state open --json number --jq '.[0].number')
           if [ -n "$num" ]; then
             gh issue comment "$num" --body-file report.md
           else
-            gh issue create --title "Health check failing" --label health-check --body-file report.md
+            gh issue create --title "Source check failing" --label source-check --body-file report.md
           fi
 
       - name: Close the issue once checks pass again
         if: steps.check.outcome == 'success'
         run: |
-          for num in $(gh issue list --label health-check --state open --json number --jq '.[].number'); do
+          for num in $(gh issue list --label source-check --state open --json number --jq '.[].number'); do
             gh issue close "$num" --comment "Checks are passing again. Closing automatically."
           done
 
-      - name: Record the weekly result in HEALTH.md
+      - name: Record the weekly result in SOURCE_CHECK.md
         if: github.event.schedule == '47 11 * * 1' || github.event_name == 'workflow_dispatch'
         run: |
-          cp report.md HEALTH.md
+          cp report.md SOURCE_CHECK.md
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add HEALTH.md
-          git diff --cached --quiet || git commit -m "Weekly health check record [skip netlify]"
+          git add SOURCE_CHECK.md
+          git diff --cached --quiet || git commit -m "Weekly source check record [skip netlify]"
           git push
 
       - name: Mark the run failed so GitHub sends an email

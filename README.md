@@ -29,8 +29,8 @@ A single "landfall point" invites the wrong conclusion ("it's going east of us, 
 | `data/coast.mjs` | Shoreline used for the crossing estimate (Census 1:500,000, which includes barrier islands). |
 | `public/data/places.json` | Coastal towns (Census Gazetteer). |
 | `public/data/landmarks.json` | Hand-added beach landmarks. Add your own here. |
-| `tools/` | The script that rebuilds the data files, a local preview server, and the health check. |
-| `.github/workflows/` | The scheduled health check (see below). |
+| `tools/` | The script that rebuilds the data files, a local preview server, and the source check. |
+| `.github/workflows/` | The scheduled source check (see below). |
 
 National Weather Service alerts are fetched by the visitor's browser straight from `api.weather.gov`.
 
@@ -44,9 +44,9 @@ The site is published by Netlify from this repository. Save a change to GitHub a
 - **Preview locally:** `node tools/dev-server.mjs`, then open http://localhost:8888.
 - **Rebuild the data files:** `pip install shapely pyshp`, then `python3 tools/build_data.py .cache`.
 
-## Keeping it working: the health check
+## Keeping it working: the source check
 
-Storms and advisories are always live: the site asks NOAA for current data on every visit and every press of **Update**, so new storms appear and finished ones drop off on their own. What the site cannot absorb by itself is a change at the source, such as NOAA renaming or moving a service. The health check exists to catch that early.
+Storms and advisories are always live: the site asks NOAA for current data on every visit and every press of **Update**, so new storms appear and finished ones drop off on their own. What the site cannot absorb by itself is a change at the source, such as NOAA renaming or moving a service. The source check exists to catch that early.
 
 **What it checks:** the NHC storm list and advisory text, the NOAA forecast map service, National Weather Service alerts, the Census address lookup, the USGS base map, and the live site end to end (home page, storm list, forecasts, address lookup).
 
@@ -58,19 +58,19 @@ Storms and advisories are always live: the site asks NOAA for current data on ev
 | All year | Weekly, Mondays |
 
 **If something fails:**
-1. GitHub emails you that the run failed, and an issue titled **"Health check failing"** opens on this repository with a plain-English report of which source broke. The issue closes itself once a later check passes.
-2. Re-check first, since one-off outages happen: **Actions** tab → **Health check** → **Run workflow**.
-3. If it still fails, a source has changed and the code needs adjusting. Ask Claude: *"The landfall tracker health check is failing,"* and share the issue. A redeploy alone won't fix a changed source.
+1. GitHub emails you that the run failed, and an issue titled **"Source check failing"** opens on this repository with a plain-English report of which source broke. The issue closes itself once a later check passes.
+2. Re-check first, since one-off outages happen: **Actions** tab → **Source check** → **Run workflow**.
+3. If it still fails, a source has changed and the code needs adjusting. Ask Claude: *"The landfall tracker source check is failing,"* and share the issue. A redeploy alone won't fix a changed source.
 
 **Other buttons worth knowing:**
-- **Re-run the check:** Actions → Health check → Run workflow.
+- **Re-run the check:** Actions → Source check → Run workflow.
 - **Republish the site as-is:** Netlify → landfall-tracker → Deploys → **Trigger deploy**. This only helps if a Netlify publish itself went wrong.
 
-**Last weekly result:** see [HEALTH.md](HEALTH.md). Writing that file each week also keeps GitHub from switching the schedule off during quiet months, since GitHub pauses scheduled checks in repositories with no changes for 60 days.
+**Last weekly result:** see [SOURCE_CHECK.md](SOURCE_CHECK.md). Writing that file each week also keeps GitHub from switching the schedule off during quiet months, since GitHub pauses scheduled checks in repositories with no changes for 60 days.
 
 **Once a year, before May:** skim the National Weather Service's notices of product changes for the coming season (search "NWS Service Change Notices") for anything about NHC products.
 
-To run the check by hand: `node tools/healthcheck.mjs`.
+To run the source check by hand: `node tools/source-check.mjs`.
 
 ## Roadmap
 

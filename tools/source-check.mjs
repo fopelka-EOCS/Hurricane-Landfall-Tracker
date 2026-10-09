@@ -1,11 +1,11 @@
-// Health check for the Hurricane Landfall Tracker.
+// Source check for the Hurricane Landfall Tracker.
 //
 // Confirms that every outside source still answers in the shape the site
 // expects, and that the live site works end to end. Run by GitHub on a
-// schedule (see .github/workflows/health-check.yml), or by hand:
+// schedule (see .github/workflows/source-check.yml), or by hand:
 //
-//   node tools/healthcheck.mjs            # prints a report, exits 1 on any failure
-//   node tools/healthcheck.mjs --out report.md
+//   node tools/source-check.mjs            # prints a report, exits 1 on any failure
+//   node tools/source-check.mjs --out report.md
 //
 // No packages needed. Each check retries a few times so a one-minute blip at
 // NOAA doesn't raise a false alarm.
@@ -14,7 +14,7 @@ import fs from "node:fs";
 import { parseAdvisory, publicAdvisory, MAP_SERVICE, NHC_STORMS_URL } from "../lib/nhc.mjs";
 
 const SITE = process.env.SITE_URL || "https://www.landfalltracker.org";
-const UA = "HurricaneLandfallTracker-HealthCheck/1.0 (contact fopelka@eocs.ltd)";
+const UA = "HurricaneLandfallTracker-SourceCheck/1.0 (contact fopelka@eocs.ltd)";
 // A public address and point used only for testing (not anyone's home).
 const TEST_ADDRESS = "1600 Pennsylvania Ave NW, Washington, DC 20500";
 const TEST_POINT = "30.4213,-87.2169"; // downtown Pensacola, FL
@@ -179,12 +179,12 @@ await check("Live site", "Coastal places file", async () => {
 // ---------------------------------------------------------------------------
 const failed = results.filter((r) => !r.ok);
 const stamp = new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
-let md = `# Health check — ${failed.length ? `❌ ${failed.length} problem${failed.length > 1 ? "s" : ""}` : "✅ all clear"}\n\n`;
+let md = `# Source check — ${failed.length ? `❌ ${failed.length} problem${failed.length > 1 ? "s" : ""}` : "✅ all clear"}\n\n`;
 md += `Checked ${stamp} against ${SITE}\n\n| | Check | Result |\n|---|---|---|\n`;
 for (const r of results) md += `| ${r.ok ? "✅" : "❌"} | ${r.group}: ${r.name} | ${r.note.replace(/\|/g, "/")} |\n`;
 if (failed.length) {
   md += `\n## What to do\n\n`;
-  md += `Something the site depends on has changed or is down. Press **Run workflow** on the Actions tab to re-check; if it still fails, ask Claude: "The landfall tracker health check is failing" and share this report.\n`;
+  md += `Something the site depends on has changed or is down. Press **Run workflow** on the Actions tab to re-check; if it still fails, ask Claude: "The landfall tracker source check is failing" and share this report.\n`;
 }
 console.log(md);
 const outIdx = process.argv.indexOf("--out");

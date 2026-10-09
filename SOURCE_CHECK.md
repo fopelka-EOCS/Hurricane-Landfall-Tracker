@@ -1,4 +1,4 @@
-# Health check — ✅ all clear
+# Source check — ✅ all clear
 
 Checked 2026-10-09 20:23 UTC against https://www.landfalltracker.org
 
