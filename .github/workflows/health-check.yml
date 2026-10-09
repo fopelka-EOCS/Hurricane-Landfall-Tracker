@@ -1,0 +1,74 @@
+# Checks that every outside source and the live site still work.
+#   Daily, May through November (hurricane season plus its early weeks).
+#   Weekly on Mondays, all year. The weekly run also refreshes HEALTH.md,
+#   which keeps GitHub from switching this schedule off during a quiet winter.
+# Any failure: the run is marked failed (GitHub emails the owner) and a
+# "Health check failing" issue is opened with the report. It closes itself
+# when a later check passes.
+# Run it by hand any time: Actions tab -> Health check -> Run workflow.
+
+name: Health check
+
+on:
+  schedule:
+    - cron: "17 11 * 5-11 *"   # daily, 6:17 AM Central (11:17 UTC), May–Nov
+    - cron: "47 11 * * 1"      # weekly, Mondays, all year (also the keep-alive)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: health-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run the checks
+        id: check
+        continue-on-error: true
+        run: node tools/healthcheck.mjs --out report.md
+
+      - name: Open or update the "Health check failing" issue
+        if: steps.check.outcome == 'failure'
+        run: |
+          gh label create health-check --color D93F0B --description "Automated health check" --force >/dev/null
+          num=$(gh issue list --label health-check --state open --json number --jq '.[0].number')
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --body-file report.md
+          else
+            gh issue create --title "Health check failing" --label health-check --body-file report.md
+          fi
+
+      - name: Close the issue once checks pass again
+        if: steps.check.outcome == 'success'
+        run: |
+          for num in $(gh issue list --label health-check --state open --json number --jq '.[].number'); do
+            gh issue close "$num" --comment "Checks are passing again. Closing automatically."
+          done
+
+      - name: Record the weekly result in HEALTH.md
+        if: github.event.schedule == '47 11 * * 1' || github.event_name == 'workflow_dispatch'
+        run: |
+          cp report.md HEALTH.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add HEALTH.md
+          git diff --cached --quiet || git commit -m "Weekly health check record [skip netlify]"
+          git push
+
+      - name: Mark the run failed so GitHub sends an email
+        if: steps.check.outcome == 'failure'
+        run: exit 1
