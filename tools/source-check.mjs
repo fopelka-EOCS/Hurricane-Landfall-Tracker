@@ -155,6 +155,16 @@ await check("Live site", "Storm list helper", async () => {
 for (const s of storms) {
   await check("Live site", `Forecast helper: ${s.name}`, async () => {
     const d = await getJSON(`${SITE}/api/forecast?storm=${s.id}`);
+    if (d.forecastPending) {
+      // NOAA posts each advisory's forecast map a little after the text, and
+      // posts none for a final advisory. Neither is a broken source.
+      const issued = Date.parse(s.publicAdvisory?.issuance || s.lastUpdate);
+      const hours = (Date.now() - issued) / 3600000;
+      const finalAdv = /final|remnant|dissipat|post-tropical/i.test((d.advisory?.headlines || []).join(" ")) || s.classification === "PC";
+      if (finalAdv) return "final advisory: NOAA posts no forecast map (normal); page shows current position";
+      expect(hours < 3, `forecast map still missing ${hours.toFixed(1)} hours after the advisory`);
+      return `forecast map not posted yet (${Math.max(0, hours * 60).toFixed(0)} min after advisory; normal); page shows current position`;
+    }
     expect(d.points && d.points.length >= 1, "no forecast points");
     expect(d.crossing && d.crossing.status, "no coast-crossing result");
     const c = d.crossing.status === "crossing" ? ` — crossing ${d.crossing.lat.toFixed(2)}, ${d.crossing.lon.toFixed(2)}` : ` — ${d.crossing.status}`;

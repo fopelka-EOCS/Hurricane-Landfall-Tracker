@@ -243,7 +243,8 @@
         <div><span class="big">${s.pressureMb ?? "—"}</span><span class="unit">mb</span><span class="cap">pressure</span></div>
         <div><span class="big">${s.movementMph ?? "—"}</span><span class="unit">mph</span><span class="cap">moving ${esc(Geo.compass(s.movementDir || 0))}</span></div>
       </div>
-      <p class="muted">Center at ${fmtLatLon(p0.lat, p0.lon)}. Advisory issued ${esc(a.issued || fmtTime(new Date(s.advisory?.issuance)))}.</p>
+      <p class="muted">Center at ${p0 ? fmtLatLon(p0.lat, p0.lon) : "—"}. Advisory issued ${esc(a.issued || fmtTime(new Date(s.advisory?.issuance)))}.</p>
+      ${fc.forecastPending ? `<p class="caveat">NHC hasn't posted the forecast map for this advisory yet, so the map shows the storm's current position only. That's normal for a brand-new storm (it usually appears within the hour) and for a final advisory. Press Update to check again.</p>` : ""}
       ${headlines ? `<ul class="headlines">${headlines}</ul>` : ""}
       <p class="small">${(a.next || []).map(esc).join(" ")} Checked ${fmtTime(state.checkedAt)}; this page refreshes itself every 15 minutes.</p>
       <p class="small"><a href="${esc(s.graphicsUrl || "https://www.nhc.noaa.gov")}" rel="noopener">NHC graphics for ${esc(s.name)}</a> · <a href="${esc(s.advisory?.url || "#")}" rel="noopener">Full advisory text</a></p>`;
@@ -262,7 +263,9 @@
   function renderCrossingCard() {
     const fc = state.fc, c = fc.crossing, card = $("crossing-card");
     let html = `<h2>Estimated coast crossing</h2>`;
-    if (!c || c.status === "no-crossing") {
+    if (fc.forecastPending) {
+      html += `<p>Waiting for NHC's forecast map for this advisory. The estimate will appear here once it's posted.</p>`;
+    } else if (!c || c.status === "no-crossing") {
       html += `<p>The ${fc.points.length > 1 ? "five-day " : ""}forecast track stays over water. No coast crossing is forecast in this advisory.</p>`;
     } else if (c.status === "over-land") {
       html += `<p>The center is already over land at ${fmtLatLon(c.lat, c.lon)}.</p>`;
@@ -323,26 +326,30 @@
     }
 
     // Wind timing
-    const tl = Geo.windTimeline(fc.points, fc.radii, addr);
-    const center0 = [fc.points[0].lon, fc.points[0].lat];
-    const ml = Geo.arrivalBracket(fc.arrival.mostLikely, center0, addr);
-    const er = Geo.arrivalBracket(fc.arrival.earliest, center0, addr);
-    const bracketText = (b) => !b ? null : b.before ? `by ${b.before}` : b.after ? `after ${b.after}` : `between ${b.from} and ${b.to}`;
-    const now = fc.points[0].time;
-    const whenText = (t) => (t <= now ? "already within reach now" : `from about ${fmtHour(t)}`);
-    html += `<h3>Wind</h3><ul class="facts">`;
-    html += `<li><strong>Tropical-storm-force winds (39+ mph):</strong> ${tl.first[34] != null ? whenText(tl.first[34]) : "not in the forecast wind field for your address"}.`;
-    if (ml) html += ` NHC's most likely arrival: <strong>${esc(bracketText(ml))}</strong>.`;
-    if (er) html += ` Earliest reasonable arrival, the time to have preparations done: <strong>${esc(bracketText(er))}</strong>.`;
-    html += `</li>`;
-    html += `<li><strong>Damaging winds (58+ mph):</strong> ${tl.first[50] != null ? whenText(tl.first[50]) : "not forecast to reach your address"}.</li>`;
-    if (tl.first[64] != null) {
-      html += `<li><strong>Hurricane-force winds (74+ mph):</strong> forecast to reach your address ${whenText(tl.first[64])}.</li>`;
-    } else if (tl.closest) {
-      const dirToCenter = Geo.compass(Geo.bearing(addr, tl.closest.center));
-      html += `<li><strong>Hurricane-force winds (74+ mph):</strong> not forecast to reach your address. At its closest, about ${esc(fmtHour(tl.closest.time))}, the center passes about <strong>${mi(tl.closest.miles)} to your ${esc(dirToCenter)}</strong>.</li>`;
+    if (fc.forecastPending || !fc.points.length) {
+      html += `<h3>Wind</h3><p>Wind timing for your address will appear once NHC posts the forecast map for this advisory. The official alerts above apply now.</p>`;
+    } else {
+      const tl = Geo.windTimeline(fc.points, fc.radii, addr);
+      const center0 = [fc.points[0].lon, fc.points[0].lat];
+      const ml = Geo.arrivalBracket(fc.arrival.mostLikely, center0, addr);
+      const er = Geo.arrivalBracket(fc.arrival.earliest, center0, addr);
+      const bracketText = (b) => !b ? null : b.before ? `by ${b.before}` : b.after ? `after ${b.after}` : `between ${b.from} and ${b.to}`;
+      const now = fc.points[0].time;
+      const whenText = (t) => (t <= now ? "already within reach now" : `from about ${fmtHour(t)}`);
+      html += `<h3>Wind</h3><ul class="facts">`;
+      html += `<li><strong>Tropical-storm-force winds (39+ mph):</strong> ${tl.first[34] != null ? whenText(tl.first[34]) : "not in the forecast wind field for your address"}.`;
+      if (ml) html += ` NHC's most likely arrival: <strong>${esc(bracketText(ml))}</strong>.`;
+      if (er) html += ` Earliest reasonable arrival, the time to have preparations done: <strong>${esc(bracketText(er))}</strong>.`;
+      html += `</li>`;
+      html += `<li><strong>Damaging winds (58+ mph):</strong> ${tl.first[50] != null ? whenText(tl.first[50]) : "not forecast to reach your address"}.</li>`;
+      if (tl.first[64] != null) {
+        html += `<li><strong>Hurricane-force winds (74+ mph):</strong> forecast to reach your address ${whenText(tl.first[64])}.</li>`;
+      } else if (tl.closest) {
+        const dirToCenter = Geo.compass(Geo.bearing(addr, tl.closest.center));
+        html += `<li><strong>Hurricane-force winds (74+ mph):</strong> not forecast to reach your address. At its closest, about ${esc(fmtHour(tl.closest.time))}, the center passes about <strong>${mi(tl.closest.miles)} to your ${esc(dirToCenter)}</strong>.</li>`;
+      }
+      html += `</ul><p class="small">From NHC's forecast wind field, which marks the farthest reach of each wind speed in each direction. It leans cautious, and it moves with every advisory.</p>`;
     }
-    html += `</ul><p class="small">From NHC's forecast wind field, which marks the farthest reach of each wind speed in each direction. It leans cautious, and it moves with every advisory.</p>`;
 
     // Side of track
     const c = fc.crossing;

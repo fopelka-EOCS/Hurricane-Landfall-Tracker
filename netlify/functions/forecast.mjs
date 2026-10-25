@@ -44,7 +44,18 @@ export default async (req) => {
       storm.advisory?.url ? publicAdvisory(storm.advisory.url).catch(() => null) : null,
     ]);
 
-    const points = layers.points
+    // NOAA reuses each map "slot" (AT1, EP2, CP3, ...) across storms. Keep only
+    // features that belong to this storm, so a lagging slot can never show
+    // another storm's forecast. Features without a name/ID field are kept.
+    const mine = (f) => {
+      const p = f.properties || {};
+      if (p.stormname) return p.stormname.toLowerCase().includes(storm.name.toLowerCase());
+      if (p.idp_subset) return p.idp_subset.toLowerCase() === storm.id;
+      return true;
+    };
+    for (const k of Object.keys(layers)) if (Array.isArray(layers[k])) layers[k] = layers[k].filter(mine);
+
+    let points = layers.points
       .map((f) => {
         const p = f.properties;
         const [lon, lat] = f.geometry.coordinates;
@@ -63,7 +74,19 @@ export default async (req) => {
       })
       .sort((a, b) => a.tau - b.tau);
 
-    const crossing = findCoastCrossing(points, onLand);
+    // NOAA posts the forecast map a little after each advisory, and posts none
+    // for a final advisory. Until it does, show the storm's current position only.
+    const forecastPending = points.length === 0;
+    if (forecastPending && Number.isFinite(storm.lat) && Number.isFinite(storm.lon)) {
+      points = [{
+        lon: storm.lon, lat: storm.lat, tau: 0,
+        time: new Date(issuedIso).getTime(),
+        label: "Now", windMph: storm.windMph, gustMph: null,
+        category: storm.category, type: storm.label,
+      }];
+    }
+
+    const crossing = forecastPending ? null : findCoastCrossing(points, onLand);
 
     const radii = layers.radii
       .map((f) => {
@@ -103,6 +126,7 @@ export default async (req) => {
           ? { exportUrl: `${MAP_SERVICE}/export`, layer: layers.surgeImageLayer }
           : null,
         crossing,
+        forecastPending,
         fetchedAt: new Date().toISOString(),
       },
       180
